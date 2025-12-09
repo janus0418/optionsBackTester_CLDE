@@ -1,0 +1,1115 @@
+nical and financial aspects.
+
+Step 1: Define Scope and Requirements 📋
+
+1.1 Identify Supported Instruments and Data Frequency: First, clarify the scope of assets and data the backtester will handle. In this case, the user wants to backtest strategies on indexes, forex, and ETFs using historical data (likely daily frequency data for simplicity). We will focus on daily data (end-of-day prices) for underlying and options. (Intraday capabilities can be added later if needed but are not a priority.)
+
+1.2 List Key Features and Metrics: The backtester must track essential performance metrics and risk measures. These include:
+
+Portfolio P&L (profit and loss) over time.
+
+Sharpe ratio (risk-adjusted return) of the strategy.
+
+Maximum drawdown (largest peak-to-trough eqContext:
+
+internet access is now given. Install required packages and check if the code works well. Also examine the below context and check if improvements can be made. 
+
+Comprehensive Plan to Build an Advanced Options Strategy Backtester
+
+Building an options strategy backtesting framework requires careful design to handle the complexity of options (multi-leg positions, time decay, volatility changes, Greeks, etc.) and to provide insightful performance metrics. Below is a detailed step-by-step guide for an automated coding agent to create a robust options backtester in Python using object-oriented programming (OOP). We outline requirements, design, implementation steps, and context about options and Greeks to ensure the agent understands both the techuity drop).
+
+Win rate, average profit per trade, and other stats if needed
+optionstranglers.com.sg
+.
+
+Rolling metrics: Ability to calculate metrics on a rolling window (e.g. a rolling 6-month Sharpe) to see how performance evolves over time.
+
+Greeks exposure and P&L attribution: Track option Greeks (Delta, Gamma, Theta, Vega, Rho) for the strategy and attribute P&L to each Greek’s movement.
+
+Breakeven calculations: Determine break-even points (underlying price at which P&L = 0) for the strategy at various time horizons (daily, weekly, monthly).
+
+Risk profile visualization: Provide tools to visualize the strategy’s profit/loss profile across different underlying prices and over time (risk graphs).
+
+1.3 Complex Strategies Support: Ensure the system can model multi-leg option strategies. This includes simple strategies like vertical spreads and iron condors, but also more complex ones:
+
+Calendar spreads (options with different expirations),
+
+Ratio spreads and butterflies/flies (strategies with differing quantities of options, e.g. 1:2 ratios, or 3-leg combos),
+
+Volatility strategies such as straddles/strangles (long or short volatility plays) and delta-neutral strategies (e.g. selling options and hedging delta with the underlying).
+
+The backtester should not be limited to single-option positions; it must handle portfolios of options and underlying simultaneously to represent complex strategies.
+
+1.4 Realism and Flexibility: Plan for realistic modeling:
+
+The backtester should use realistic option pricing inputs (implied volatilities, interest rates, etc.) rather than simplifying assumptions, to better simulate true performance
+optionstranglers.com.sg
+.
+
+It should handle transaction costs/slippage for trades (at least allow assumptions like bid-ask spread impact).
+
+Keep the design flexible so new strategy rules or new Greeks/models can be added without rewriting core parts (strong justification for an OOP approach).
+
+By clearly defining these requirements upfront, we set a solid foundation for the design. In summary, the goal is an OOP-driven Python backtester that can simulate complex option strategies on historical data and produce detailed risk metrics (Sharpe, drawdowns, Greek breakdowns, breakevens, etc.) to evaluate strategy performance.
+
+Step 2: Data Collection and Preparation 🗄️
+
+2.1 Gather Historical Market Data: The agent should obtain historical underlying price data for the chosen assets (indexes, forex, ETFs) and historical options data for those underlyings. Ideally, we need option chain data for each day of the backtest including prices (or at least end-of-day quotes) for all strikes and expirations used by the strategy. Key data to collect for each option contract:
+
+Underlying price (to know the spot price each day),
+
+Strike price, expiration date, option type (call/put),
+
+Option price (at entry and exit, or daily if marking to market),
+
+Implied volatility of the option (IV)
+optionstranglers.com.sg
+,
+
+Option Greeks (delta, gamma, theta, vega, possibly rho) if available, or else these can be computed.
+
+In addition, interest rates (risk-free rate) and any dividend yields for the underlying may be needed for pricing models
+optionstranglers.com.sg
+. If we are focusing on indexes and ETFs, an approximation like a constant interest rate or known yield can be used for each period.
+
+Platforms like ORATS or OptionNet Explorer provide full historical options chain data including IV and Greeks
+optionstranglers.com.sg
+. If using those isn’t an option, consider data sources like Yahoo Finance (for underlying) and an options data provider or an API (e.g. Polygon.io, Interactive Brokers, Databento, etc.). Note that options data can be massive in size – daily option chain files can be many gigabytes
+linkedin.com
+, so the agent should be prepared to handle large datasets efficiently. Strategies may need filtering (e.g., only load data for strikes used or use on-the-fly pricing) to avoid memory issues.
+
+2.2 Data Structures for Data: Design how the data will be stored/accessed:
+
+A MarketData class or module can manage loaded data. For example, it could provide a method get_option_price(date, strike, expiry, type) to retrieve prices or get_volatility(date, strike, expiry) to retrieve IV. Internally, this might be a dictionary or pandas DataFrame indexed by date and option parameters.
+
+We might also preload needed data into memory (for a smaller universe) or stream from disk for performance. The agent should consider using efficient structures (pandas, NumPy, or even databases if needed) to query historical prices quickly.
+
+2.3 Data Cleaning and Alignment: The agent should ensure that the underlying price data and option data are properly aligned by date. If using daily data, all observations should use the same timestamp (e.g. market close). It’s crucial to handle corporate actions (splits, dividends) if they affect option strikes or underlying prices (e.g. adjust historical prices or option strikes accordingly). Also, be mindful of illiquidity or missing data for certain strikes – the strategy should be designed to either avoid those or handle gaps (perhaps by interpolation or skipping those trades).
+
+By preparing comprehensive and clean data, the backtester can price options accurately and simulate trades under realistic conditions.
+
+Step 3: Object-Oriented Design of the Backtester 🏗️
+
+Using an object-oriented programming approach will make the backtester extensible and easier to maintain. Key classes and their responsibilities should be defined as follows:
+
+3.1 Option and Underlying Classes:
+
+UnderlyingAsset class: represents the underlying security (e.g. an index or ETF). It could hold the historical price series and perhaps methods to get returns or other properties. This could also be as simple as storing a ticker and referencing data from MarketData.
+
+OptionContract class: represents an individual option position. Attributes might include underlying (link to an UnderlyingAsset), strike, expiration date, option type (call/put), and contract multiplier (typically 100 for equity options). This class can have methods like price(date) to get its market price (from MarketData or a model) and methods to calculate Greeks (delta(date), vega(date), etc.) using a pricing model if needed.
+
+3.2 Strategy/Position Classes:
+
+OptionPosition class: could represent one leg of a strategy (an option contract along with quantity and whether it’s long or short). For example, short 2 calls at strike X expiring Y.
+
+Strategy class (or OptionStrategyPortfolio): this class holds a collection of OptionPosition objects (and could also include underlying asset positions for strategies that involve stock). It encapsulates a multi-leg strategy. Methods here might include:
+
+calc_value(date): compute total market value of the strategy on a given date (sum of each position’s price * quantity * contract size).
+
+calc_greeks(date): compute aggregate Greeks of the strategy (sum of each position’s delta, vega, etc., times position quantity).
+
+get_break_even(date): compute break-even underlying price at a certain date (more on this in breakeven section).
+
+It may also include logic for trade entry/exit rules if this represents an ongoing strategy instance being simulated.
+
+Alternatively, one might design specific subclasses for known strategy types (e.g., CalendarSpreadStrategy, ButterflyStrategy) with predefined structures. However, a more flexible design is to allow a Strategy to be composed of arbitrary positions, so the user/agent can build any structure by adding legs.
+
+3.3 Backtest Engine Classes:
+
+Backtester or BacktestEngine class: orchestrates the simulation. It will:
+
+Take the strategy definition (or multiple strategies) and simulate their performance over a date range.
+
+Decide when to enter and exit positions according to strategy rules (e.g., open a new position every month, roll at expiration, or continuous delta-hedging adjustments).
+
+Track the portfolio’s cash and P&L over time as trades occur.
+
+Record performance metrics as the simulation runs (or store the time series of portfolio value for later analysis).
+
+This class will be the core of running a backtest. It might have methods like run_backtest(start_date, end_date) which returns a results object or report.
+
+3.4 Risk/Analytics Classes:
+
+PerformanceMetrics class: Could be used to compute metrics like Sharpe ratio, drawdown, etc., from the portfolio equity curve or returns. For instance, it might take daily P&L or portfolio value series and compute:
+
+Total return, CAGR
+
+Sharpe Ratio (annualized) = (mean daily return / std dev of daily return) * sqrt(252)
+interactivebrokers.com
+.
+
+Max Drawdown = max peak-to-trough loss on the equity curve
+optionstranglers.com.sg
+.
+
+Sortino ratio, win rate, etc., if needed.
+
+GreeksAttribution class or methods: Though not strictly necessary to separate, the logic to attribute P&L to Greeks might be kept in a utility that, given two consecutive days’ data for a strategy, computes how much of the P&L came from Delta movement, from Gamma, Theta, Vega, etc. (We will detail this in Step 5).
+
+3.5 Visualization Utilities:
+
+While not necessarily an object, having a module or class (e.g., RiskGraphPlotter) to create risk profile plots is useful. It might take a Strategy and plot P&L vs underlying price for various scenarios.
+
+Using OOP, each part of the backtester has a clear responsibility. For example, if we need to upgrade the Greek calculation model, we can modify the OptionContract class or a pricing model class without touching the backtest engine or strategy logic. This modular design aligns with the complexity of options: encapsulating data and behavior for options, strategies, and the simulation separately makes the code easier to extend for new strategy types or analytics.
+
+Step 4: Implementing Option Pricing and Greeks Calculation 📈
+
+Accurate option pricing is at the heart of the backtester, especially for calculating Greeks and marking positions to market each day. The agent should implement (or integrate) a pricing model that goes beyond a naive Black-Scholes approach. Here’s the plan:
+
+4.1 Pricing Model Selection: We want to use state-of-the-art research for option pricing and Greeks rather than a plain Black-Scholes with constant volatility. Real markets exhibit volatility skew and term structure, so our backtester should incorporate implied volatility surfaces. Two approaches:
+
+Use Implied Market Data: If historical implied volatilities for each option are available (as part of the data collected), the simplest approach is to use the Black-Scholes formula with the option’s implied volatility. In practice, trading desks often compute “Black-Scholes Greeks” by plugging in the market’s implied vol for that option
+quant.stackexchange.com
+. This yields Greeks that are consistent with the observed market price. The agent can implement the Black-Scholes formulas (for option price and Greeks) but use the IV from data as input, instead of a single constant vol assumption.
+
+Volatility Surface Interpolation: If needed, build an implied vol surface for each date. For example, use techniques like SVI (Stochastic Volatility Inspired) or spline interpolation to get a smooth surface of IV across strikes and maturities
+quant.stackexchange.com
+. Then the agent can price any arbitrary strike by interpolating the IV. This is useful for intermediate calculations (like finding break-even at non-quoted strikes).
+
+Advanced Models: A more advanced route (if time permits) is to utilize models like Heston, SABR, or local volatility models to capture dynamics beyond Black-Scholes. However, implementing these from scratch is complex. A practical alternative is to use a library like QuantLib (Python bindings) or py_vollib which provides Black-Scholes, Black 76, and greeks calculation. QuantLib can also handle more complex models if needed. As "state-of-the-art," the agent might integrate such libraries to ensure robust Greek calculations.
+
+4.2 Greeks Calculation: Ensure the backtester can compute the Greeks for each option position on any given date:
+
+Delta: sensitivity to underlying price. For calls, delta ≈ N(d1) under Black-Scholes; for puts, N(d1) - 1. If using implied vol, plug that in. Delta can also be approximated by finite difference: (price(S+δ) - price(S-δ)) / (2*δ).
+
+Gamma: second-order sensitivity to underlying. BS formula provides gamma = (N'(d1) / (S * σ * sqrt(T)) ). Using implied σ for that option yields a more market-consistent gamma.
+
+Theta: time decay. BS formula or numerical difference (price(T-δt) - price(T)) / δt.
+
+Vega: sensitivity to volatility. BS vega = S * N'(d1) * sqrt(T) (for 1% change in vol, scaled appropriately). Using implied vol here accounts for skew to first order.
+
+Rho: sensitivity to interest rates (we may include this, though it’s typically smaller for short-dated trades, but for completeness).
+
+These can be implemented as methods in the OptionContract class or in a separate GreekCalculator. If using a library, one can obtain these values directly. The main point is do not assume a flat volatility – always use the appropriate implied vol for each option to get realistic Greeks, addressing the user’s concern about naive Black-Scholes. Implied vol surfaces shift over time and by strike
+linkedin.com
+, and our backtester will reflect that.
+
+4.3 Verification of Pricing: After implementing, test the pricing model on known cases (e.g., check that at expiration, option price equals intrinsic value; deep ITM/OTM options have deltas ~1/0, etc.). This ensures the agent’s pricing is correct. Also consider sanity-checking Greeks (e.g., gamma is highest for ATM options
+investopedia.com
+, theta for near expiry, etc., as theory predicts).
+
+By employing a robust pricing approach, the backtester can evaluate complex strategies accurately. This advanced pricing foundation is necessary for realistic P&L simulation and meaningful Greek attributions.
+
+Step 5: Simulating Trades and Strategy Logic 🤖
+
+With data and pricing in place, the agent needs to simulate the execution of strategies over time:
+
+5.1 Strategy Entry & Exit Rules: Define how and when the strategy trades. This depends on the specific strategy:
+
+For example, a calendar spread strategy might roll into a new spread each month: e.g., at each monthly expiration, sell a 30-day call and buy a 60-day call (same strike) if certain conditions (like IV or technical indicator) are met.
+
+A ratio spread strategy might open positions when certain volatility conditions occur, etc.
+
+If the user wants generic capabilities, allow the strategy to be defined by a set of rules or signals (perhaps passed as functions or configured). For now, we can hardcode some logic for demonstration or allow the agent to easily modify strategy criteria.
+
+The backtester should iterate through each trading day and decide if new trades are opened or existing trades closed. For each day:
+
+Update the market data (underlying price move, time decay, any IV change).
+
+Evaluate entry criteria: e.g., if it’s a scheduled entry day or some indicator triggers, initiate a new strategy position (create OptionPosition objects for each leg at that day’s prices).
+
+Evaluate exit criteria: e.g., if a profit target or stop loss is hit, or if it’s time to close (like 21 DTE or at expiration). Close positions accordingly and record the P&L for that trade.
+
+Rollover/expiration handling: If an option expires, the backtester should handle exercising (if in the money and if strategy would exercise) or just let it expire worthless. Often for strategy backtests, one assumes cash settlement or closing at last trading day’s price. Implement logic for expiration (e.g., remove expired option from portfolio, add/subtract its final P&L).
+
+5.2 Portfolio Accounting: The BacktestEngine should keep track of cash and positions:
+
+When opening a position, deduct the premium paid (or add premium received) from cash.
+
+As days progress, mark-to-market the open positions using current option prices (from Step 4’s model or data). The net of mark-to-market value plus cash gives the portfolio equity.
+
+Include transaction costs if desired (for example, subtract some slippage for each trade; this can be a fixed fraction of bid-ask spread or a flat commission).
+
+Record daily portfolio value or returns for metrics calculation.
+
+5.3 Handling Multi-Leg Strategies: The Strategy class can generate multiple trade orders at once. For example, entering a butterfly might involve buying 1 call at strike A, selling 2 calls at strike B, buying 1 call at strike C simultaneously. The backtester should treat that as one logical trade (perhaps group them in the results). Ensure that all legs use the same date’s prices when “filled”. If partial fills or execution order is not a concern (we assume ideal fills at quoted prices for backtest simplicity), we can execute them all at once.
+
+5.4 Delta Hedging (if needed): For volatility strategies where we want to remain delta-neutral (e.g., short straddle with daily delta hedge by underlying), incorporate that logic. That means each day, if net delta of the portfolio ≠ 0, trade the underlying asset to offset it. The Strategy or BacktestEngine can include a step to adjust underlying position = –(net delta of options) to maintain delta ≈ 0. This introduces additional P&L (from the underlying trades) that should be accounted for. The backtester should log these hedging trades and include them in P&L.
+
+5.5 Example Workflow: (Putting it together)
+
+Start on start_date with empty positions, certain initial capital.
+
+On a trade entry signal (or periodic schedule), construct a Strategy (set of option positions) and add it to portfolio. Record entry Greeks (this can be useful for analysis/journaling
+optionstranglers.com.sg
+).
+
+Each day, update option prices; compute P&L of open positions from yesterday to today (due to underlying move, theta, vol change).
+
+If any exit conditions trigger (or if options expire), close the position and record the realized P&L.
+
+Continue until end_date.
+
+The agent should implement this loop carefully to avoid look-ahead bias (only use information available up to that day), and overfitting should be guarded against by not tweaking rules to history (though this is more on the user – the backtester just provides honest results).
+
+By the end of the simulation, the backtester will have a complete history of trades and daily portfolio values.
+
+Step 6: P&L Attribution by Greeks 🔍
+
+One advanced feature required is the ability to attribute daily P&L of the strategy to the different Greeks. This helps in understanding what drives profits or losses (delta moves, time decay, volatility shifts, etc.). The agent should implement a P&L explain module as follows:
+
+6.1 Daily P&L Breakdown: For each day where the strategy has positions, compute how much the portfolio’s value changed due to each risk factor:
+
+Delta effect: Approximately 
+Δ
+×
+Δ
+𝑆
+Δ×ΔS, i.e. portfolio delta * change in underlying price.
+
+Gamma effect: Approximately 
+1
+2
+Γ
+×
+(
+Δ
+𝑆
+)
+2
+2
+1
+	​
+
+Γ×(ΔS)
+2
+ for the day (this is a second-order effect, often smaller but important near expiration or large moves).
+
+Theta effect: Approximately 
+−
+Θ
+×
+Δ
+𝑡
+−Θ×Δt (time decay for one day, which should be negative for long options, positive for short options).
+
+Vega effect: 
+Vega
+×
+Δ
+𝜎
+Vega×Δσ, where 
+Δ
+𝜎
+Δσ is the change in implied vol of the option (or an approximate change in the underlying’s IV level).
+
+Rho effect: 
+Rho
+×
+Δ
+𝑟
+Rho×Δr, if interest rates moved (often negligible day-to-day unless a rate shift or for long-dated options).
+
+The backtester can use the Greeks from the previous day’s close (or today’s open, effectively the same info set) to estimate the P&L components for today. This is essentially a first-order Taylor series expansion of the option price movement
+quant.stackexchange.com
+. In formula form, for each option 
+𝑖
+i:
+
+𝑃
+&
+𝐿
+explained
+,
+𝑖
+≈
+Δ
+𝑖
+Δ
+𝑆
++
+1
+2
+Γ
+𝑖
+(
+Δ
+𝑆
+)
+2
++
+Θ
+𝑖
+Δ
+𝑡
++
+Vega
+𝑖
+Δ
+𝜎
++
+Rho
+𝑖
+Δ
+𝑟
+.
+P&L
+explained,i
+	​
+
+≈Δ
+i
+	​
+
+ΔS+
+2
+1
+	​
+
+Γ
+i
+	​
+
+(ΔS)
+2
++Θ
+i
+	​
+
+Δt+Vega
+i
+	​
+
+Δσ+Rho
+i
+	​
+
+Δr.
+
+Summing across all positions gives the portfolio P&L explained by risk factors. The backtester should compare this to the actual P&L (based on actual price change) – the difference is the unexplained P&L (which should be small if the Greeks and vol change captured most effects)
+quant.stackexchange.com
+.
+
+For accuracy, use yesterday’s Greeks and market changes from yesterday to today:
+
+Get portfolio Greeks at end of day T-1.
+
+Get underlying price change from T-1 to T, implied vol change from T-1 to T (for each option or overall skew shift).
+
+Apply the above formulas.
+
+6.2 Greek Attribution Reporting: The backtester can output a time series or summary of P&L attribution, e.g.:
+
+Total P&L = $X, of which: Delta P&L = $A, Gamma P&L = $B, Theta P&L = $C, Vega P&L = $D, remainder = unexplained.
+
+Perhaps percentages of total P&L from each source could be informative.
+
+This kind of breakdown is valuable for understanding strategy behavior. For example, a calendar spread might have most P&L from theta (time decay) and vega, with minimal delta if set up delta-neutral. A put-selling strategy will show profits mainly from theta (time decay) if underlying barely moved, but large negative delta P&L on a market drop. Having these insights aligns with how professionals analyze option strategies (similar to “PnL Explain” reports on trading desks).
+
+Implementing this also double-checks that the Greeks are correctly computed and that the strategy’s risk profile is as expected. (If there’s consistently large unexplained P&L, that might indicate our Greeks or vol assumptions need improvement.)
+
+Step 7: Calculating Performance Metrics 📊
+
+After or during the backtest simulation, the agent should compute the overall performance metrics for the strategy. Many of these metrics can be calculated once the daily portfolio value or returns are known:
+
+7.1 Equity Curve and Returns: From the simulation, derive the equity curve – the portfolio value over time (assuming some starting capital). Alternatively, track daily returns (daily P&L divided by previous day portfolio value). From this data, we can calculate:
+
+Total return over the period and annualized return (CAGR).
+
+Volatility of returns (standard deviation of daily returns, annualized by √252).
+
+7.2 Sharpe Ratio: Using the above, Sharpe = (Annualized Return – RiskFreeRate) / Annualized Volatility of returns
+interactivebrokers.com
+. If risk-free rate is small or if we assume zero for simplicity, it’s ~Return/Vol. The agent should clarify the risk-free rate assumption (could use the interest rate data used for option pricing as the risk-free rate).
+
+7.3 Max Drawdown: Iterate through the equity curve to find the largest percentage drop from a peak to a subsequent trough. Record also when it happened. For example, if the strategy equity grew to $100k, then fell to $80k, that’s a 20% drawdown. We may also record drawdown duration (how long to recover).
+
+7.4 Other Metrics: As needed, compute:
+
+Sortino Ratio (like Sharpe but only downside deviation in denom)
+interactivebrokers.com
+.
+
+Win rate (if we count trades: percentage of trades that were profitable).
+
+Average profit per trade and average loss per trade.
+
+Profit factor (sum of profits / sum of losses).
+
+Exposure time: e.g., % of days the strategy had any position, if that’s relevant (some strategies aren’t always in the market)
+interactivebrokers.com
+.
+
+Turnover or number of trades, etc.
+
+The agent should compile these into a report. The resource suggests capturing these metrics for options strategies
+optionstranglers.com.sg
+, such as Sharpe ratio, max drawdown, win rate, average P&L, etc., as they all “contribute to the long-term viability of your options strategy”
+optionstranglers.com.sg
+.
+
+7.5 Rolling Metrics: To address the requirement of rolling performance metrics: The agent can implement a rolling-window calculation for key metrics:
+
+For example, compute the Sharpe ratio over every 1-year period within the backtest (rolling monthly). This would show how the strategy’s Sharpe changes through time, indicating consistency or regime sensitivity.
+
+Similarly, rolling max drawdown or rolling average P&L can be computed.
+
+This could be done by sliding a window over the daily returns series and recalculating metrics for each window. It helps identify if performance was concentrated in certain periods or stable throughout.
+
+7.6 Output and Visualization: It’s useful to output the equity curve and perhaps plot it. A steadily rising curve with limited drawdowns is ideal
+optionstranglers.com.sg
+. The agent might generate a plot of cumulative returns over time, and even mark where drawdowns occurred. Additionally, tabulating the metrics in a clear format (or returning a dict/JSON for an automated agent to consume) will be the final step of the backtest run.
+
+With these metrics computed, the backtester can clearly show how the strategy performed and allow the user to compare strategies or tweak them. This fulfills the requirement of evaluating performance comprehensively (both absolute and risk-adjusted performance).
+
+Step 8: Risk Profile and P&L Visualization 📈
+
+A standout feature for the backtester is the ability to visualize option strategy payoff profiles and risk over time. This helps the user (or developer) to understand the strategy’s behavior in different scenarios and as time passes. The agent should implement tools for this:
+
+8.1 Static Payoff Diagram (Expiration): For any given strategy position, the classic risk graph is the payoff at expiration vs underlying price. The agent can generate this by:
+
+Taking the strategy (collection of option positions, etc.),
+
+For a range of underlying prices around the current price (say ±20% or a reasonable range),
+
+Calculate the expiration P&L for the strategy at each underlying price (i.e., use option payoff: each call = max(S_K - strike, 0), put = max(strike - S_K, 0); account for whether long/short and premiums paid/received).
+
+Plot underlying price on X-axis and P&L on Y-axis. Mark the breakeven point(s) where P&L = 0 on this graph (points where the curve crosses the X-axis)
+investopedia.com
+.
+
+This expiration payoff chart is a baseline. However, it doesn’t show interim risk (before expiration).
+
+8.2 Risk Graph Over Time: A more advanced visual is showing how the P&L curve changes at different times before expiration. Because prior to expiration, options still have time value and their P&L profile is not just a sharp V-shaped payoff but a smoother curve depending on time and volatility. The agent can approach this by generating multiple curves:
+
+Choose several time points (e.g., 30 days to expiry, 15 days to expiry, 1 day to expiry) or perhaps intervals like “now”, “1 week later”, “expiration”.
+
+For each, assume the strategy is held to that point in time, and calculate the theoretical P&L if the underlying were at various prices at that time, assuming implied volatilities at that time (this requires a model of how IV might change – one could assume IV stays same for simplicity, or term structure scenario).
+
+Essentially, price the strategy at that future time for various underlying prices. This can be done by taking the current Greeks and extrapolating, or more accurately, re-pricing options with less time to expiry.
+
+For example, to get the P&L profile 1 week from now: reduce time to expiration by 7 days for each option, possibly keep IV constant or adjust if expecting IV to drop as expiration nears, then price each option for a grid of underlying prices. Compare those option portfolio values to the value today to compute P&L (or to initial cost to see profit). Plot those curves.
+
+The result might be a series of curves showing P&L lines “moving” upward or downward as time passes (theta decay shifts the curve) and changing shape as volatility changes. This is essentially what professional tools show – a 3D surface of P&L vs underlying vs time. We can implement it by generating discrete slices and perhaps even animate or 3D plot it.
+
+8.3 Greeks Profile Visualization: Another useful visual is how the Greeks of the strategy change with underlying or time. For instance, plot the strategy’s delta as a function of underlying price (that’s the slope of the P&L curve at each point) – which is effectively the first derivative of the risk graph. Similarly, vega as a function of underlying might show how exposed the strategy is to vol at different scenarios. These are secondary, but can be insightful (especially for teaching or understanding what risks are at extreme underlying moves).
+
+8.4 Tools and Libraries: The agent can use plotting libraries like matplotlib for static 2D graphs or plotly for interactive charts. The risk/reward profile chart should clearly indicate:
+
+X-axis: underlying price,
+
+Y-axis: profit or loss,
+
+Different colored lines for different times (including expiration).
+
+Breakeven points highlighted (perhaps as dots where the line crosses zero).
+
+Possibly markers for current underlying price and current P&L.
+
+These visuals align with the requirement of risk profile/P&L profile visualizers. As Investopedia notes, “a risk graph (profit/loss diagram) provides an easy way to understand the effect of what may happen to an option or any complex option position in the future”
+investopedia.com
+. It allows traders to see max profit potential, max risk, and break-evens at a glance
+investopedia.com
+. By implementing this, the backtester becomes not just a number-cruncher but a tool for insightful analysis, aiding in trade planning and risk management.
+
+Step 9: Breakeven Calculations 📍
+
+The user specifically requested the capability to compute daily/weekly/monthly breakevens. Breakeven in an options strategy context typically means the underlying price at which the strategy results in no profit/no loss. We have partially addressed this in risk graphs, but here is how the agent should implement it in detail:
+
+9.1 Breakeven at Expiration: This is straightforward: solve for underlying price where expiration payoff = 0 (including net premiums paid/received). Many strategies have one or two breakeven points at expiration. The agent can find these by examining the payoff function:
+
+For example, in a short straddle (sell call and put), breakevens are strike ± total premium received.
+
+In a call spread, breakeven is strike of lower call + premium paid, etc.
+
+These can be solved analytically for simple strategies or by scanning the payoff curve for sign changes.
+
+9.2 Breakeven Before Expiration (Daily/Weekly): This is more complex because options still have time value. We interpret “daily/weekly/monthly breakevens” as: if I were to close the position in X days, at what underlying price will I break even? In other words, incorporating time decay up to that point. To compute this:
+
+Pick a horizon, e.g. 5 trading days (one week). Take the strategy with 5 fewer days to expiry, and find underlying price where strategy’s theoretical value in 5 days = initial trade entry cost (or = value today if looking forward).
+
+This requires assuming something about implied volatility in 5 days. Perhaps assume IV stays constant (or one could assume mean-reversion to some level). The agent can simplify by using current IV for that calculation.
+
+Essentially, find 
+𝑆
+S such that P&L in 5 days is 0. P&L in 5 days = strategy value in 5 days – strategy cost. We want that = 0, so strategy value in 5 days = strategy cost. We can use a root-finding approach (like binary search on underlying price) where for a guessed underlying price, we price each option (with 5 days less to expiry) and compute net value.
+
+By doing this for various horizons (1 day, 7 days, 30 days, etc.), the agent can produce a schedule of breakeven prices over time. Often, as time passes, breakeven points will converge toward the expiration breakevens but could move inward or outward depending on the Greeks. For instance, an out-of-the-money short option might have a current breakeven far out, but as time decays, the breakeven may move closer to the strike.
+
+9.3 Output of Breakevens: The agent should present these breakevens clearly, e.g.:
+
+“Breakeven price if closing today: $XYZ” (basically current underlying price ±0 since today’s breakeven is trivial – the P&L is 0 at current price by definition of marking to market).
+
+“Projected breakeven in 1 week: $X (upside) and $Y (downside)”
+
+“Projected breakeven at expiration: $U (lower) and $V (upper)”
+
+This can also be visualized on the risk graph by vertical lines or annotations.
+
+Including breakeven calculations meets the requirement and is useful for traders to know how much the underlying can move before the strategy starts losing/gaining money at different times.
+
+Step 10: Testing the Backtester and Further Enhancements ✅
+
+Finally, instruct the coding agent to thoroughly test the backtester and consider future improvements:
+
+10.1 Unit Tests on Components: Ensure individual components work:
+
+Test the Option pricing against known values (e.g., does a call with strike = spot, no time to expiry equal max(S-K,0)? Does increasing underlying by small amount equal delta?).
+
+Test P&L calculation on simple scenarios (like a single call option that goes ITM, does the P&L equal what we expect).
+
+Test strategy P&L on a known strategy example. For instance, an iron condor backtest from Jan 2020–Jan 2024 might have known stats
+optionstranglers.com.sg
+. While we might not replicate exactly, we can at least simulate a short iron condor strategy over that period and see if results make sense (e.g., positive overall P&L in high-vol environments, etc.).
+
+10.2 Backtest Example: Run a small backtest to verify end-to-end:
+
+e.g., backtest a 30-day covered call on SPY for 2022-2023. Check if the backtester’s outputs (Sharpe, P&L) align with intuition (probably a positive income but with limited upside, etc.).
+
+Or backtest a delta-neutral short straddle on an index over a volatile period to see if the P&L attribution shows big losses from vega during volatility spikes.
+
+Examine the logs or outputs to ensure:
+
+Trades are entered/exited correctly at intended times.
+
+The portfolio value updates correctly.
+
+Greeks attribution roughly sums up to actual P&L (small unexplained portion).
+
+Performance metrics reflect the trade outcomes.
+
+If any discrepancies arise, debug those sections (Greeks calc, data alignment, etc.).
+
+10.3 Performance Considerations: If the backtester will be run on large universes or many strategies, consider performance improvements:
+
+Use vectorized computations with NumPy/pandas where possible (e.g., batch-compute option prices for all strikes in a vector).
+
+If data is huge (GBs of options data), implement lazy loading (load only needed dates/strikes on the fly) or use a database.
+
+The agent might integrate parallel processing if running many backtest scenarios.
+
+10.4 Extensibility: The OOP design allows future extensions:
+
+Additional Greeks (like second-order Greeks vanna, vomma if needed).
+
+New strategy entry logic (could implement a callback or strategy definition language).
+
+Using machine learning agents to optimize strategy parameters – now that we have a backtester, one could loop over parameters or use an optimizer to find the best strategy (taking care to avoid overfitting).
+
+Live trading integration: eventually, use the backtester’s logic on live data (paper trading) to validate performance forward.
+
+10.5 Documentation: Ensure the code is well-documented, given the complexity. It should explain formulas used (for Black-Scholes, Greeks) and assumptions (e.g., “IV is assumed constant over small intervals for Greeks attribution”).
+
+By meticulously testing and iterating, we ensure the backtesting framework is reliable. At this point, the automated coding agent would have a comprehensive system capable of evaluating complex options strategies under realistic conditions. It will enable analyzing strategy performance with metrics like Sharpe and drawdowns, attributing profits to risk factors, and visualizing risk/reward profiles — all crucial for a professional options trader
+optionstranglers.com.sg
+optionstranglers.com.sg
+.
+
+Prompt:
+You are an expert quantitative developer and options practitioner.
+
+Your task: 
+Design and implement a robust, object-oriented OPTIONS STRATEGY BACKTESTER in Python that can handle complex multi-leg volatility strategies (e.g., calendar spreads, ratio spreads, butterflies), compute advanced Greeks and PnL attribution, and output performance metrics (Sharpe, PnL, max drawdown, etc.) including rolling-window statistics and breakeven analytics (daily/weekly/monthly). It must also include rich risk/PnL profile visualizations across time and spot prices.
+
+Focus on production-grade design: clean class architecture, modularity, extensibility, and unit tests.
+
+====================================
+0. GENERAL EXPECTATIONS
+====================================
+
+- Language: Python 3.x
+- Main libraries (unless you choose better equivalents):
+  - numpy, pandas
+  - scipy (for root-finding, optimization, and distribution functions)
+  - matplotlib and/or plotly for plotting (prefer plotly for interactive views)
+  - Optional: numba for performance, statsmodels for extra analytics
+- Coding style:
+  - Use classes and interfaces (via abc.ABC) for key components.
+  - Use dataclasses where appropriate (for simple data containers).
+  - Include detailed docstrings and type hints.
+  - Write unit tests for core components (pricing, Greeks, PnL attribution, metrics).
+- Design to be run in:
+  - A script/CLI entry point, and
+  - A Jupyter notebook for interactive exploration.
+
+IMPORTANT: Avoid a “toy” Black-Scholes-only, flat-vol implementation. You MUST design the Greeks and pricing machinery with modern market practice in mind:
+- Work with implied vol surfaces (skew/smile).
+- Support at least one stochastic or local volatility model OR a model-free “bump & revalue” approach on the implied vol surface.
+- Make the model framework pluggable (e.g., Black-Scholes, Bachelier, SABR/Heston, model-free Greeks from surface).
+
+====================================
+1. DOMAIN BACKGROUND (FOR DESIGN CONTEXT)
+====================================
+
+Build the system with the following conceptual understanding:
+
+1.1 Options and Strategies
+- Each option is defined by: underlying, option_type (call/put), style (European, and optionally American), strike, expiry, notional/contract_size, and position direction (long/short).
+- Strategies are portfolios of “legs” (each leg is one option position, possibly with a ratio).
+  - Calendar spreads: same strike, different expiries.
+  - Vertical spreads: different strikes, same expiry.
+  - Ratio spreads: uneven quantities of different legs.
+  - Butterflies, condors: combinations of multiple strikes and legs.
+  - Volatility strategies: e.g., delta-hedged straddles/strangles, gamma scalping.
+
+1.2 Greeks and PnL Attribution
+- Greeks at minimum: Delta, Gamma, Vega, Theta, Rho.
+- “Advanced” Greeks (for realism, if feasible): Vanna, Vomma, Charm, etc.
+- PnL changes can be decomposed approximately as:
+  ΔPnL ≈ Δ * ΔS + 0.5 * Γ * (ΔS)^2 + Vega * Δσ + Theta * Δt + Rho * Δr + (higher-order / residual)
+- The backtester must attribute PnL (per leg, per strategy, and portfolio-level) to:
+  - Delta PnL
+  - Gamma PnL
+  - Vega PnL
+  - Theta PnL
+  - Rho PnL
+  - Residual/unexplained PnL
+
+1.3 Performance Metrics
+- Portfolio-level and strategy-level metrics:
+  - Total PnL (absolute and %)
+  - Sharpe ratio (annualized) based on daily returns
+  - Max drawdown
+  - Volatility of returns (annualized)
+- Rolling metrics:
+  - Rolling Sharpe, rolling max drawdown, rolling annualized vol
+  - Configurable rolling windows (e.g., 20 days, 60 days, 252 days)
+- Breakeven analysis:
+  - Daily / weekly / monthly breakevens:
+    - For each horizon (e.g., 1D, 1W, 1M from current date), find the underlying spot levels where PnL of the strategy is 0.
+    - Support multiple breakeven points (e.g., lower and upper breakevens).
+
+====================================
+2. HIGH-LEVEL ARCHITECTURE
+====================================
+
+Design a modular, object-oriented architecture with these core layers:
+
+- Market Data Layer
+- Instrument & Strategy Layer
+- Pricing & Greeks Engine Layer
+- Backtest & Simulation Engine Layer
+- Risk & Analytics Layer
+- Visualization Layer
+- Configuration & I/O Layer
+
+====================================
+3. DATA & MARKET STATE DESIGN
+====================================
+
+3.1 MarketData class
+Create a `MarketData` class to encapsulate all relevant inputs over time:
+
+- Attributes:
+  - time_index: pandas.DatetimeIndex
+  - spot_prices: pd.Series or pd.DataFrame (per underlying)
+  - risk_free_rates: pd.Series or curve object (tenor-structured)
+  - dividend_yields or forward curves
+  - implied_vol_surface: an object capable of returning implied vol for (expiry, strike, moneyness, etc.) at a given date
+  - optional: realized volatility estimates, borrow rates, transaction costs
+
+- Methods:
+  - get_spot(date, underlying)
+  - get_forward(date, underlying, expiry) [if needed]
+  - get_rate(date, tenor or expiry)
+  - get_dividend_yield(date, underlying, tenor or expiry)
+  - get_implied_vol(date, underlying, strike, expiry, model="surface" or other)
+  - slice between dates for sub-backtests
+
+3.2 VolSurface class
+Implement a `VolSurface` abstraction:
+
+- Inputs:
+  - Grid of implied vols by (date, expiry, strike or delta or moneyness).
+- Methods:
+  - iv(strike, expiry) → implied_vol
+  - iv_by_delta(delta, expiry) → implied_vol
+  - Interpolation across strike & expiry (e.g., spline, linear, etc.).
+  - Extrapolation rules or constraints.
+
+====================================
+4. INSTRUMENT & STRATEGY OBJECTS
+====================================
+
+4.1 OptionContract
+Create an `OptionContract` dataclass:
+
+- Attributes:
+  - underlying: str
+  - option_type: str ("call" or "put")
+  - style: str ("european" initially; allow extension)
+  - strike: float
+  - expiry: pd.Timestamp or date
+  - contract_size: float (e.g., 100 shares per contract)
+- Methods:
+  - __repr__ for debugging
+
+4.2 OptionPosition / Leg
+Create an `OptionLeg` class:
+
+- Attributes:
+  - contract: OptionContract
+  - quantity: float (positive for long, negative for short)
+- Methods:
+  - price(date, market_state, model)
+  - greeks(date, market_state, model)
+
+4.3 Strategy Base Class
+Create an abstract `OptionStrategy` class:
+
+- Attributes:
+  - name: str
+  - legs: list[OptionLeg]
+- Methods:
+  - value(date, market_state, model) → float
+  - greeks(date, market_state, model) → aggregated greeks dict
+  - payoff(spot, at_expiry: bool = True) → float (for static payoff diagrams)
+  - methods to add/remove legs
+
+4.4 Concrete Strategy Examples
+Implement concrete strategy builders (could be factory methods or subclasses):
+
+- `CalendarSpreadStrategy`
+  - Two legs, same strike, different expiries.
+- `VerticalSpreadStrategy`
+  - Two legs, same expiry, different strikes.
+- `RatioSpreadStrategy`
+  - Two or more legs with non-1:1 quantities.
+- `ButterflyStrategy` / `IronCondorStrategy`
+  - Standard four-leg structures.
+- `VolTradingStrategy`
+  - Example: long straddle + dynamic delta hedge.
+  - Contains logic for rebalancing hedge periodically.
+
+Allow users to define generic custom strategies via configuration (JSON/YAML) describing legs.
+
+4.5 Portfolio
+Create a `Portfolio` class:
+
+- Attributes:
+  - strategies: list[OptionStrategy]
+  - cash: float
+- Methods:
+  - value(date, market_state, model) → float
+  - greeks(date, market_state, model) → portfolio-aggregated Greeks
+  - record_trade(date, fills, fees)
+  - get_positions(date) (if you track trade history and open/close)
+
+====================================
+5. PRICING & ADVANCED GREEKS ENGINE
+====================================
+
+Design a flexible pricing framework with a pluggable model interface.
+
+5.1 PricingModel Base Class
+Create an abstract `PricingModel` class (using abc.ABC):
+
+- Methods:
+  - price(option: OptionContract, date, market_state) → float
+  - greeks(option: OptionContract, date, market_state) → dict
+  - optional: calibrate() for models that require calibration.
+
+5.2 Implement at least these model types:
+
+A) Black-Scholes-Merton Model (baseline)
+- Use standard lognormal assumptions with:
+  - Underlying spot (or forward)
+  - Constant or term-structured risk-free rate
+  - Dividend yield or cost of carry
+  - Implied vol from the vol surface at (strike, expiry)
+- Provide closed-form price and Greeks:
+  - Price, Delta, Gamma, Vega, Theta, Rho.
+
+B) Bachelier (Normal) Model (for low-rate or futures-based markets)
+- Implement normal-model pricing (additive rather than multiplicative).
+- Provide closed-form price and basic Greeks.
+
+C) Model-Free / Surface-Based Greeks
+- Implement a “bump & revalue” engine that:
+  - Uses the implied vol surface directly,
+  - Perturbs inputs (spot, vol, etc.) and recomputes prices,
+  - Estimates Greeks numerically:
+    - Delta: bump spot
+    - Gamma: second derivative wrt spot
+    - Vega: bump implied vol (local vol from surface)
+    - Rho: bump interest rate
+  - This allows Greeks that reflect the skew/smile structure, not just flat vol.
+
+D) Advanced Vol Model (SABR or Heston)
+- Implement at least one advanced model. You can:
+  - Implement SABR (stochastic alpha beta rho) approximation formulas for implied vols.
+  - Or implement a simplified Heston model with Fourier pricing.
+- Provide:
+  - Price function using the chosen model.
+  - Greeks via:
+    - Analytical approximations, if known,
+    - Or numerical differentiation (bump & revalue within that model).
+- Design the code so that adding more sophisticated models later is easy.
+
+5.3 Model Selection
+- Allow the user to choose the pricing model per backtest or per strategy:
+  - e.g., `model = BlackScholesModel(vol_surface, rates, divs)`
+  - or `model = SabrModel(calibrated_params, rates, divs)`
+- Allow fallback to surface-based numeric Greeks if closed-form is not available.
+
+====================================
+6. BACKTEST & SIMULATION ENGINE
+====================================
+
+6.1 BacktestConfig
+Create a `BacktestConfig` dataclass:
+
+- Attributes:
+  - start_date, end_date
+  - rebalancing_frequency (e.g., "daily", "weekly", “custom”)
+  - transaction_costs: per contract, per notional, bid-ask spread assumptions
+  - slippage model (if implemented)
+  - initial_capital
+  - risk_free_rate_proxy (if not directly from data)
+  - rolling_windows: list of ints (in days) for rolling stats
+  - model_selection: which PricingModel to use and its parameters
+
+6.2 BacktestEngine
+Create a `BacktestEngine` class:
+
+- Attributes:
+  - market_data: MarketData
+  - portfolio: Portfolio
+  - config: BacktestConfig
+  - model: PricingModel
+  - internal data structures to store:
+    - daily portfolio value
+    - daily strategy values
+    - daily PnL (realized and unrealized)
+    - daily Greeks
+    - daily PnL attribution by Greeks
+    - trades executed
+
+- Core Methods:
+  - run():
+    - Loop over each trading date from start_date to end_date:
+      1. Retrieve market_state for that date (spot, rates, vols, etc.).
+      2. For each strategy, compute:
+         - Value
+         - Greeks per leg and aggregated
+      3. Compute portfolio value and portfolio Greeks.
+      4. Compute daily PnL:
+         - Mark-to-market vs previous day.
+         - Realized PnL from closed positions.
+      5. PnL Attribution:
+         - Approximate Delta PnL, Gamma PnL, Vega PnL, Theta PnL, Rho PnL using Greeks and observed changes in S, σ, r, time.
+         - Residual = total PnL - (sum Greek-attributed PnL).
+      6. Apply risk/position management rules:
+         - e.g., delta-hedge strategies, stop-loss, rebalancing.
+      7. Record all metrics into a time series structure (e.g., pandas DataFrame).
+  - get_results():
+    - Return a structured object or DataFrames of:
+      - Portfolio value series
+      - Strategy value series
+      - PnL series and components
+      - Greeks time series
+      - PnL attribution time series
+
+6.3 Strategy Execution Logic
+- Allow two approaches:
+  - Static strategies:
+    - Enter positions at t0, hold until expiry or end_date.
+  - Dynamic strategies:
+    - Rebalance rules, e.g.:
+      - Roll calendars: close near-dated leg and open new one.
+      - Gamma scalping: delta-hedge when delta deviates beyond a threshold.
+      - Vol targeting: adjust position size based on portfolio vol.
+- Implement a flexible signal interface so users can plug in custom logic.
+
+====================================
+7. METRICS & ROLLING STATISTICS
+====================================
+
+7.1 PerformanceMetrics class
+Create a `PerformanceMetrics` class:
+
+- Input:
+  - A pandas Series/DataFrame of portfolio (or strategy) daily returns.
+- Methods:
+  - cumulative_pnl()
+  - annualized_return()
+  - annualized_vol()
+  - sharpe_ratio(rf: float or series)
+  - max_drawdown()
+  - Calmar ratio, sortino ratio (optional).
+
+7.2 Rolling Metrics
+- Implement methods to compute rolling metrics over specified windows:
+  - rolling_sharpe(window)
+  - rolling_max_drawdown(window)
+  - rolling_vol(window)
+- Return these as pandas Series indexed by date.
+
+7.3 Multi-Granularity Metrics
+- From daily data, aggregate to:
+  - Weekly returns (e.g., Friday-to-Friday)
+  - Monthly returns (e.g., month-end)
+- Compute metrics at:
+  - daily level
+  - weekly aggregated level
+  - monthly aggregated level
+
+====================================
+8. BREAKEVEN CALCULATION
+====================================
+
+Implement a `BreakevenAnalyzer` component:
+
+- For a given strategy and date t (current date):
+
+  1. Define horizons:
+     - Daily: t + 1 trading day
+     - Weekly: t + ~5 trading days
+     - Monthly: t + ~21 trading days (or calendar month end)
+
+  2. For each horizon H:
+     - Assume a specific scenario set for:
+       - implied vol evolution (e.g., constant IV, mean-reverting, or user-specified shift)
+       - rates, dividends
+     - For a grid of spot prices around current spot (e.g., ±50% with fine resolution):
+       - Compute the strategy’s hypothetical PnL at horizon H:
+         PnL_H(S) = value_at_H(S) - current_cost (plus carry, if any).
+     - Use root-finding on the PnL_H(S) function (or detect zero crossings on the grid) to find:
+       - lower_breakeven(H)
+       - upper_breakeven(H)
+     - Store these breakevens per date and horizon.
+
+- Provide:
+  - Methods to get daily/weekly/monthly breakeven levels as time series.
+  - Methods to visualize breakeven bands over time.
+
+====================================
+9. PNL & RISK PROFILE VISUALIZATIONS
+====================================
+
+Implement a `VisualizationEngine` class with functions that use matplotlib or plotly:
+
+9.1 PnL Over Time
+- Plot:
+  - Portfolio PnL over time (cumulative and daily)
+  - Strategy-level PnL over time
+  - Drawdown curve
+
+9.2 PnL Attribution Plots
+- Stacked bar plots showing:
+  - Daily/weekly contributions of Delta, Gamma, Vega, Theta, Rho, Residual PnL.
+- Cumulative PnL by component.
+
+9.3 Risk Profile vs Spot
+- For selected dates (e.g., today, each expiration, or monthly markers):
+  - Plot payoff/PnL vs spot at a given horizon (e.g., expiry or 1W/1M).
+  - Show:
+    - Current mark-to-market PnL line.
+    - Expiry payoff.
+    - Optional scenario lines (e.g., vol up/down).
+
+- Optionally, include 3D or heatmap plots:
+  - axes: spot vs time, color: PnL
+  - axes: spot vs implied vol shift, color: PnL
+
+9.4 Breakeven Visualization
+- Plot breakeven levels over time:
+  - Daily/weekly/monthly breakeven bands on top of spot price.
+- This visually shows how the “breakeven corridor” moves as time passes.
+
+9.5 Greeks Over Time
+- Time series plots of:
+  - Portfolio Delta, Gamma, Vega, Theta, Rho.
+- Separate by strategy if possible.
+
+====================================
+10. GREEKS-BASED PNL ATTRIBUTION (DETAIL)
+====================================
+
+Implement a dedicated `PnLAttributionEngine`:
+
+- Inputs (per date t and t+1):
+  - Portfolio/strategy values V_t, V_{t+1}
+  - Spot S_t, S_{t+1}
+  - Implied volatility params (e.g., local IV or vol surface state) at t and t+1
+  - Risk-free rates r_t, r_{t+1}
+  - Time step Δt (in years)
+  - Greeks at t: Δ_t, Γ_t, Vega_t, Theta_t, Rho_t, etc.
+
+- Approximate decomposition:
+  - ΔS = S_{t+1} - S_t
+  - Δσ = σ_{t+1} - σ_t (or some proxy change from surface)
+  - Δr = r_{t+1} - r_t
+  - ΔPnL_total = V_{t+1} - V_t + realized PnL from trades
+  - Compute contributions:
+    - PnL_delta = Δ_t * ΔS
+    - PnL_gamma = 0.5 * Γ_t * (ΔS)^2
+    - PnL_vega = Vega_t * Δσ
+    - PnL_theta = Theta_t * Δt
+    - PnL_rho = Rho_t * Δr
+  - Residual:
+    - PnL_residual = ΔPnL_total - (PnL_delta + PnL_gamma + PnL_vega + PnL_theta + PnL_rho)
+
+- Store this breakdown per strategy and per leg if possible, aggregating to portfolio.
+
+====================================
+11. TESTING & VALIDATION
+====================================
+
+Implement tests to validate:
+
+- Pricing correctness:
+  - Compare Black-Scholes prices and Greeks with known closed-form benchmarks.
+  - Test Bachelier implementation on known examples.
+- Numerical Greeks:
+  - Verify bump-and-revalue Greeks converge to analytical ones for simple cases.
+- Strategy payoffs:
+  - For simple verticals, butterflies, calendars, verify payoff diagrams match theoretical expectations at expiry.
+- Backtest invariants:
+  - No-trade backtest should only show PnL driven by time decay and market moves.
+- Metrics:
+  - Sharpe, max drawdown, rolling stats computed correctly on simple synthetic return series.
+
+====================================
+12. CONFIGURATION & USER INTERFACE
+====================================
+
+- Allow reading strategy definitions from a config file (JSON/YAML):
+  - Underlying, legs (option_type, strike, expiry, ratio/quantity, long/short).
+  - Entry/exit rules (e.g., open at start_date, close at expiry or specified date).
+- Allow specifying:
+  - model type & parameters
+  - time frame
+  - risk-free rate assumptions
+  - transaction cost assumptions
+  - rolling windows for metrics
+- Provide a simple command line interface (CLI) and/or Jupyter notebooks:
+  - Example notebook:
+    - Load data
+    - Define a calendar spread strategy
+    - Run backtest
+    - View PnL, metrics, and risk profiles
+    - Analyze PnL attribution by Greeks
+    - Examine breakevens over time.
+
+====================================
+13. DELIVERABLES
+====================================
+
+1) A Python package/module structure, for example:
+   - backtester/
+     - __init__.py
+     - data.py          (MarketData, VolSurface)
+     - instruments.py   (OptionContract, OptionLeg, Strategy classes)
+     - models.py        (PricingModel base, BS, Bachelier, SABR/Heston, SurfaceGreeksModel)
+     - backtest.py      (BacktestEngine, BacktestConfig)
+     - metrics.py       (PerformanceMetrics, BreakevenAnalyzer, PnLAttributionEngine)
+     - visualize.py     (VisualizationEngine)
+     - utils.py         (helpers)
+     - tests/           (unit tests)
+
+2) One or more example scripts/notebooks demonstrating:
+   - A simple calendar spread backtest.
+   - A ratio spread or butterfly backtest.
+   - A vol-trading (delta-hedged) strategy backtest.
+   - Generating:
+     - PnL and drawdown curves
+     - Rolling Sharpe
+     - PnL attribution to each Greek
+     - Daily/weekly/monthly breakevens
+     - Risk profile vs spot and time.
+
+3) Clear documentation (README or notebook cells) explaining:
+   - How to run the backtester.
+   - How to add new strategies or pricing models.
+   - How to interpret PnL attribution and breakeven plots.

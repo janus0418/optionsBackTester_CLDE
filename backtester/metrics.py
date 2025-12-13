@@ -213,6 +213,285 @@ class PerformanceMetrics:
         rolling_vol = returns.rolling(window).std() * np.sqrt(252)
         return rolling_vol
 
+    def omega_ratio(self, threshold: float = 0.0) -> float:
+        """
+        Calculate Omega ratio.
+
+        The Omega ratio is the probability-weighted ratio of gains versus losses
+        above/below a threshold. Unlike Sharpe, it considers the entire distribution
+        of returns, not just mean and variance.
+
+        Args:
+            threshold: Return threshold (default 0.0 for risk-free rate)
+
+        Returns:
+            Omega ratio
+        """
+        returns = self.results['returns'].dropna()
+
+        # Adjust threshold to daily
+        daily_threshold = threshold / 252.0
+
+        # Gains and losses relative to threshold
+        gains = returns[returns > daily_threshold] - daily_threshold
+        losses = daily_threshold - returns[returns <= daily_threshold]
+
+        if len(losses) == 0 or losses.sum() == 0:
+            return np.inf
+
+        return gains.sum() / losses.sum()
+
+    def sterling_ratio(self, lookback_years: int = 3) -> float:
+        """
+        Calculate Sterling ratio.
+
+        Sterling Ratio = Annual Return / Average of Largest Drawdowns
+
+        Args:
+            lookback_years: Number of years for average drawdown calculation
+
+        Returns:
+            Sterling ratio
+        """
+        annual_return = self.annualized_return()
+
+        # Calculate drawdowns
+        portfolio_values = self.results['portfolio_value']
+        cumulative_max = portfolio_values.expanding().max()
+        drawdown = (portfolio_values - cumulative_max) / cumulative_max
+
+        # Get largest drawdowns per year (or all if less data)
+        years = max(1, int(len(self.results) / 252))
+        n_drawdowns = min(years, lookback_years)
+
+        # Find n largest drawdowns
+        largest_dds = drawdown.nsmallest(n_drawdowns).values
+        avg_dd = abs(largest_dds.mean())
+
+        if avg_dd == 0:
+            return np.inf
+
+        return annual_return / avg_dd
+
+    def ulcer_index(self) -> float:
+        """
+        Calculate Ulcer Index (measure of downside volatility/pain).
+
+        UI = sqrt(mean(drawdown^2))
+
+        Lower is better. Measures depth and duration of drawdowns.
+
+        Returns:
+            Ulcer Index
+        """
+        portfolio_values = self.results['portfolio_value']
+        cumulative_max = portfolio_values.expanding().max()
+        drawdown_pct = (portfolio_values - cumulative_max) / cumulative_max * 100  # As percentage
+
+        ulcer = np.sqrt((drawdown_pct ** 2).mean())
+        return ulcer
+
+    def value_at_risk(self, confidence: float = 0.95) -> float:
+        """
+        Calculate Value at Risk (VaR) at given confidence level.
+
+        VaR is the maximum expected loss over a period at a given confidence level.
+
+        Args:
+            confidence: Confidence level (e.g., 0.95 for 95%)
+
+        Returns:
+            VaR (as positive number representing loss)
+        """
+        returns = self.results['returns'].dropna()
+        var = -np.percentile(returns, (1 - confidence) * 100)
+        return var
+
+    def conditional_var(self, confidence: float = 0.95) -> float:
+        """
+        Calculate Conditional Value at Risk (CVaR / Expected Shortfall).
+
+        CVaR is the expected loss given that losses exceed VaR threshold.
+
+        Args:
+            confidence: Confidence level (e.g., 0.95 for 95%)
+
+        Returns:
+            CVaR (as positive number representing expected loss)
+        """
+        returns = self.results['returns'].dropna()
+        var_threshold = np.percentile(returns, (1 - confidence) * 100)
+
+        # Average of returns below VaR threshold
+        tail_returns = returns[returns <= var_threshold]
+
+        if len(tail_returns) == 0:
+            return 0.0
+
+        cvar = -tail_returns.mean()
+        return cvar
+
+    def skewness(self) -> float:
+        """
+        Calculate skewness of returns distribution.
+
+        Negative skew = more extreme losses than gains
+        Positive skew = more extreme gains than losses
+
+        Returns:
+            Skewness
+        """
+        returns = self.results['returns'].dropna()
+        from scipy import stats
+        return stats.skew(returns)
+
+    def kurtosis(self) -> float:
+        """
+        Calculate excess kurtosis of returns distribution.
+
+        High kurtosis = fat tails (more extreme events than normal distribution)
+
+        Returns:
+            Excess kurtosis
+        """
+        returns = self.results['returns'].dropna()
+        from scipy import stats
+        return stats.kurtosis(returns)
+
+    def recovery_factor(self) -> float:
+        """
+        Calculate Recovery Factor.
+
+        Recovery Factor = Total Return / |Max Drawdown|
+
+        Measures how much profit is made relative to worst drawdown.
+
+        Returns:
+            Recovery factor
+        """
+        total_ret = self.total_return()
+        max_dd, _, _ = self.max_drawdown()
+
+        if max_dd == 0:
+            return np.inf
+
+        return total_ret / abs(max_dd)
+
+    def expectancy(self) -> float:
+        """
+        Calculate trading expectancy.
+
+        Expectancy = (Win Rate * Avg Win) - (Loss Rate * Avg Loss)
+
+        Returns:
+            Expected value per trade
+        """
+        returns = self.results['returns'].dropna()
+
+        wins = returns[returns > 0]
+        losses = returns[returns < 0]
+
+        if len(returns) == 0:
+            return 0.0
+
+        win_rate = len(wins) / len(returns)
+        loss_rate = len(losses) / len(returns)
+
+        avg_win = wins.mean() if len(wins) > 0 else 0.0
+        avg_loss = abs(losses.mean()) if len(losses) > 0 else 0.0
+
+        return (win_rate * avg_win) - (loss_rate * avg_loss)
+
+    def average_win_loss_ratio(self) -> float:
+        """
+        Calculate average win to average loss ratio.
+
+        Returns:
+            Win/Loss ratio
+        """
+        returns = self.results['returns'].dropna()
+
+        wins = returns[returns > 0]
+        losses = returns[returns < 0]
+
+        if len(losses) == 0:
+            return np.inf
+
+        avg_win = wins.mean() if len(wins) > 0 else 0.0
+        avg_loss = abs(losses.mean())
+
+        return avg_win / avg_loss
+
+    def max_consecutive_wins(self) -> int:
+        """Calculate maximum consecutive winning days."""
+        returns = self.results['returns'].dropna()
+        wins = (returns > 0).astype(int)
+
+        max_streak = 0
+        current_streak = 0
+
+        for win in wins:
+            if win:
+                current_streak += 1
+                max_streak = max(max_streak, current_streak)
+            else:
+                current_streak = 0
+
+        return max_streak
+
+    def max_consecutive_losses(self) -> int:
+        """Calculate maximum consecutive losing days."""
+        returns = self.results['returns'].dropna()
+        losses = (returns < 0).astype(int)
+
+        max_streak = 0
+        current_streak = 0
+
+        for loss in losses:
+            if loss:
+                current_streak += 1
+                max_streak = max(max_streak, current_streak)
+            else:
+                current_streak = 0
+
+        return max_streak
+
+    def information_ratio(self, benchmark_returns: Optional[pd.Series] = None) -> float:
+        """
+        Calculate Information Ratio (IR).
+
+        IR = (Portfolio Return - Benchmark Return) / Tracking Error
+
+        Args:
+            benchmark_returns: Benchmark returns series (if None, uses 0)
+
+        Returns:
+            Information ratio
+        """
+        if benchmark_returns is None:
+            benchmark_returns = pd.Series(0, index=self.results.index)
+
+        portfolio_returns = self.results['returns'].dropna()
+
+        # Align indices
+        portfolio_returns, benchmark_returns = portfolio_returns.align(
+            benchmark_returns, join='inner'
+        )
+
+        # Excess returns
+        excess_returns = portfolio_returns - benchmark_returns
+
+        # Tracking error (std of excess returns)
+        tracking_error = excess_returns.std() * np.sqrt(252)
+
+        if tracking_error == 0:
+            return 0.0
+
+        # Annualized excess return
+        annualized_excess = excess_returns.mean() * 252
+
+        return annualized_excess / tracking_error
+
     def summary(self) -> Dict[str, float]:
         """
         Generate summary statistics.
@@ -228,10 +507,22 @@ class PerformanceMetrics:
             'Annualized Volatility': self.annualized_volatility(),
             'Sharpe Ratio': self.sharpe_ratio(),
             'Sortino Ratio': self.sortino_ratio(),
+            'Omega Ratio': self.omega_ratio(),
             'Max Drawdown': max_dd,
             'Calmar Ratio': self.calmar_ratio(),
+            'Sterling Ratio': self.sterling_ratio(),
+            'Ulcer Index': self.ulcer_index(),
             'Win Rate': self.win_rate(),
             'Profit Factor': self.profit_factor(),
+            'Recovery Factor': self.recovery_factor(),
+            'Expectancy': self.expectancy(),
+            'Avg Win/Loss': self.average_win_loss_ratio(),
+            'Max Consecutive Wins': self.max_consecutive_wins(),
+            'Max Consecutive Losses': self.max_consecutive_losses(),
+            'VaR (95%)': self.value_at_risk(0.95),
+            'CVaR (95%)': self.conditional_var(0.95),
+            'Skewness': self.skewness(),
+            'Kurtosis': self.kurtosis(),
             'Number of Days': len(self.results),
         }
 
@@ -239,19 +530,21 @@ class PerformanceMetrics:
         """Print formatted summary."""
         summary = self.summary()
 
-        print("\n" + "="*50)
+        print("\n" + "="*60)
         print("PERFORMANCE SUMMARY")
-        print("="*50)
+        print("="*60)
 
         for metric, value in summary.items():
-            if 'Return' in metric or 'Volatility' in metric or 'Drawdown' in metric:
-                print(f"{metric:30s}: {value:>10.2%}")
-            elif 'Ratio' in metric or 'Rate' in metric or 'Factor' in metric:
-                print(f"{metric:30s}: {value:>10.2f}")
+            if 'Return' in metric or 'Volatility' in metric or 'Drawdown' in metric or 'VaR' in metric or 'CVaR' in metric or 'Expectancy' in metric:
+                print(f"{metric:35s}: {value:>10.2%}")
+            elif 'Ratio' in metric or 'Rate' in metric or 'Factor' in metric or 'Skewness' in metric or 'Kurtosis' in metric or 'Index' in metric:
+                print(f"{metric:35s}: {value:>10.2f}")
+            elif 'Consecutive' in metric or 'Number' in metric:
+                print(f"{metric:35s}: {value:>10.0f}")
             else:
-                print(f"{metric:30s}: {value:>10.0f}")
+                print(f"{metric:35s}: {value:>10.2f}")
 
-        print("="*50)
+        print("="*60)
 
 
 class PnLAttributionEngine:

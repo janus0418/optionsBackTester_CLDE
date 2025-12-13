@@ -1,0 +1,30 @@
+Metric,Value
+Total Return,0.2047692919921878
+Annualized Return (CAGR),0.10274358982262699
+Annualized Volatility,0.05447729923586775
+Sharpe Ratio,0.9681755623432358
+Sortino Ratio,1.0359655357165813
+Max Drawdown,-0.04549707499438694
+Calmar Ratio,2.2582460484614155
+Win Rate,0.6727272727272727
+Profit Factor,2.342558082268084
+Average Win,965.6514322476772
+Average Loss,-847.3429885525175
+Win/Loss Ratio,1.1396228508331219
+Expectancy,372.307803622159
+Recovery Factor,4.500713331954869
+Omega Ratio,2.4538822415307338
+Ulcer Index,1.456050023701676
+VaR (95%),-0.0
+CVaR (95%),0.000293647367273585
+Skewness,1.371871734641079
+Kurtosis,18.381845766551443
+Max Consecutive Wins,17.0
+Max Consecutive Losses,6.0
+Total Trades,55.0
+Trading Days,480.0
+Trades per Month,2.40625
+Avg Hold Days,13.763636363636364
+Profit Target Hit Rate,0.0
+Stop Loss Hit Rate,0.0
+Time Stop Hit Rate,1.0

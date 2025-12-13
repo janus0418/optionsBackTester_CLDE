@@ -6,6 +6,9 @@ A comprehensive framework for backtesting complex options strategies.
 __version__ = "1.0.0"
 
 from .data import MarketData, VolSurface
+from .data_loaders import (
+    DataSourceAdapter, DoltHubAdapter, CSVAdapter, MarketDataLoader
+)
 from .instruments import (
     OptionContract, OptionLeg, OptionStrategy, Portfolio,
     CalendarSpreadStrategy, VerticalSpreadStrategy, ButterflyStrategy,
@@ -19,6 +22,10 @@ from .visualize import VisualizationEngine
 __all__ = [
     'MarketData',
     'VolSurface',
+    'DataSourceAdapter',
+    'DoltHubAdapter',
+    'CSVAdapter',
+    'MarketDataLoader',
     'OptionContract',
     'OptionLeg',
     'OptionStrategy',
